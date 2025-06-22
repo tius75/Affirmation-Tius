@@ -107,6 +107,7 @@
             gap: 20px;
             width: 100%;
             max-width: 1200px;
+            box-sizing: border-box; /* Tambahkan ini */
         }
 
         .card {
@@ -388,10 +389,47 @@
             margin-bottom: 0;
             word-wrap: break-word;
         }
+        
+        /* Gaya untuk input file */
+        .file-upload-wrapper {
+            margin-top: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .file-upload-wrapper label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.95em;
+            color: #333;
+        }
+
+        .file-upload-wrapper input[type="file"] {
+            display: none; /* Sembunyikan input file asli */
+        }
+
+        .custom-file-upload {
+            border: 1px solid #ccc;
+            display: inline-block;
+            padding: 8px 12px;
+            cursor: pointer;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+        }
+
+        .custom-file-upload:hover {
+            background-color: #e0e0e0;
+        }
+
 
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
+                padding: 0 10px; /* Tambahkan padding agar tidak mentok tepi */
             }
             .card-actions {
                 flex-direction: column;
@@ -409,6 +447,24 @@
             }
             .preview-card .card-image {
                 height: 250px;
+            }
+            /* Rapihkan tab-menu agar tidak bergeser */
+            .tab-menu {
+                max-width: 100%;
+                justify-content: space-around;
+                padding: 0 10px;
+                box-sizing: border-box;
+            }
+            .tab-button {
+                flex: none; /* Batasi pertumbuhan button */
+                width: 48%; /* Atur lebar agar 2 kolom */
+                margin-bottom: 10px;
+            }
+            .manual-input-section {
+                padding: 15px;
+            }
+            #manualAffirmationInput, #customAffirmationTitle, #customImageURL {
+                width: 100%; /* Pastikan lebar penuh */
             }
         }
 
@@ -653,10 +709,19 @@
                 <button onclick="setTextPosition('bottom-right')">Kanan Bawah</button>
             </div>
             <button id="createCustomCardBtn">Perbarui Pratinjau Kartu</button>
+            
+            <div class="file-upload-wrapper">
+                <label for="localImageUpload">Pilih Gambar dari Komputer Anda (Opsional):</label>
+                <input type="file" id="localImageUpload" accept="image/*">
+                <label for="localImageUpload" class="custom-file-upload">
+                    <i class="fas fa-upload"></i> Unggah Gambar
+                </label>
+            </div>
+
             <div style="margin-top: 15px; text-align: center;">
                 <label for="customImageURL">URL Gambar Latar Belakang Kustom (Opsional):</label>
                 <input type="text" id="customImageURL" placeholder="https://picsum.photos/800/600" style="width: calc(100% - 20px); padding: 8px; border-radius: 5% !important; border: 1px solid #ddd; margin-top: 5px;">
-                <button onclick="updateCustomImage()" style="margin-top: 10px;">Ganti Gambar Latar</button>
+                <button onclick="updateCustomImage()" style="margin-top: 10px;">Ganti Gambar Latar dari URL</button>
             </div>
 
 
@@ -828,6 +893,7 @@
         const previewImage = customCardPreview.querySelector('.card-image');
         const loadingOverlay = document.getElementById('loadingOverlay');
         const getOnlineAffirmationBtn = document.getElementById('getOnlineAffirmationBtn');
+        const localImageUploadInput = document.getElementById('localImageUpload'); // NEW: Local image input
 
         // NEW: Tab Section Elements
         const predefinedAffirmationsSection = document.getElementById('predefinedAffirmationsSection');
@@ -838,6 +904,7 @@
         let currentCategory = 'all';
         previewImage.src = getRandomImageUrl();
         let currentCustomImageUrl = previewImage.src; 
+        let currentLocalImageBlob = null; // NEW: To store Blob URL for local image
 
         function getRandomInt(max) {
             return Math.floor(Math.random() * max);
@@ -875,10 +942,14 @@
 
             const downloadBtn = document.createElement('button');
             downloadBtn.innerHTML = '<i class="fas fa-download"></i> Unduh JPG';
+            // Ubah ID tombol download untuk predefined card agar tidak bentrok
+            downloadBtn.setAttribute('id', 'downloadPredefinedCardBtn'); 
             downloadBtn.onclick = () => downloadGeneratedCardAsImage(item.title, item.description, img.src);
 
             const socialShareBtn = document.createElement('button');
             socialShareBtn.innerHTML = '<i class="fas fa-share-alt"></i> Bagikan Sosial Media';
+            // Ubah ID tombol share untuk predefined card agar tidak bentrok
+            socialShareBtn.setAttribute('id', 'sharePredefinedCardSocialBtn'); 
             socialShareBtn.onclick = () => shareCardOnSocialMedia(item.title, item.description, img.src);
 
             actions.appendChild(downloadBtn);
@@ -941,6 +1012,21 @@
         fontColorInput.addEventListener('input', updatePreview); 
         fontSizeInput.addEventListener('input', updatePreview);   
         getOnlineAffirmationBtn.addEventListener('click', getOnlineAffirmation);
+        // NEW: Event listener for local image upload
+        localImageUploadInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    currentLocalImageBlob = e.target.result; // Store blob URL
+                    customImageURLInput.value = ''; // Clear URL input if local image is selected
+                    updatePreview();
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
 
         function updatePreview() {
             const customTitle = customAffirmationTitleInput.value; 
@@ -1008,11 +1094,13 @@
                     new URL(url); 
                     previewImage.src = url;
                     currentCustomImageUrl = url;
+                    currentLocalImageBlob = null; // Clear local image if URL is entered
+                    localImageUploadInput.value = ''; // Clear file input
                 } catch (e) {
                     alert('URL gambar tidak valid. Pastikan formatnya benar (misal: https://example.com/image.jpg)');
                     customImageURLInput.value = currentCustomImageUrl; 
                 }
-            } else {
+            } else if (!currentLocalImageBlob) { // Only set random if no local image is present
                 previewImage.src = getRandomImageUrl(); 
                 currentCustomImageUrl = previewImage.src;
             }
@@ -1067,7 +1155,7 @@
          * Creates a temporary DOM element structured for image download.
          * @param {string} title - The title of the card.
          * @param {string} descriptionHtml - The HTML content of the description/affirmation text.
-         * @param {string} imageUrl - The URL of the background image.
+         * @param {string} imageUrl - The URL of the background image (can be Blob URL or standard URL).
          * @param {boolean} isCustom - True if it's a custom card, false for generated cards.
          * @param {string} [customTitle] - Optional: The custom title for the custom card.
          * @param {boolean} [forShare=false] - If true, the text will be overlaid on the image for social sharing.
@@ -1116,7 +1204,13 @@
             imageSection.classList.add('download-image-section');
             const img = document.createElement('img');
             img.src = imageUrl;
-            img.crossOrigin = "anonymous"; 
+            // Penting: Set crossOrigin="anonymous" hanya jika gambar berasal dari domain yang berbeda
+            // Jika gambar lokal (blob URL), ini bisa dihapus atau tidak diperlukan.
+            // Untuk memastikan html2canvas bisa memproses, seringkali gambar lokal diubah ke base64
+            // Namun, blob URL juga seringkali berfungsi.
+            if (imageUrl.startsWith('http')) {
+                img.crossOrigin = "anonymous"; 
+            }
             imageSection.appendChild(img);
             
             console.log(`[createDownloadableElement] Attempting to load image: ${imageUrl}`);
@@ -1138,7 +1232,8 @@
                     img.onerror = (e) => {
                         clearTimeout(timeout);
                         console.error(`[createDownloadableElement] Image failed to load (CORS issue or broken URL?): ${imageUrl}`, e);
-                        img.src = 'https://picsum.photos/800/600?random=' + Math.random(); // Fallback random image
+                        // Fallback to a random Picsum image if an image (especially local or custom URL) fails
+                        img.src = 'https://picsum.photos/800/600?random=' + Math.random(); 
                         console.log(`[createDownloadableElement] Attempting fallback image: ${img.src}`);
                         img.onload = resolve; 
                         img.onerror = () => {
@@ -1245,7 +1340,7 @@
                 console.log(`[DELAY] Delay finished. Attempting html2canvas...`);
 
                 const canvas = await html2canvas(elementToCapture, {
-                    useCORS: true,
+                    useCORS: true, // Biarkan true, html2canvas akan mencoba menanganinya.
                     allowTaint: false, // Set to false. If cross-origin image issue exists, it will throw an error, which is better than silent failure.
                     backgroundColor: null, 
                     scale: 2, 
@@ -1284,11 +1379,14 @@
             updatePreview(); 
 
             const customTitle = customAffirmationTitleInput.value.trim() || "Afirmasi Kustom Anda";
+            // Tentukan URL gambar yang akan digunakan: prioritaskan gambar lokal, lalu URL kustom, terakhir gambar acak
+            const imageUrlToUse = currentLocalImageBlob || customImageURLInput.value.trim() || getRandomImageUrl();
+
             // Use innerHTML for description to preserve rich text formatting
             const downloadableElement = await createDownloadableElement(
                 '', 
                 manualAffirmationInput.innerHTML, 
-                previewImage.src, 
+                imageUrlToUse, // Gunakan gambar yang ditentukan
                 true, 
                 customTitle,
                 false // NOT for share, so text below image
@@ -1359,11 +1457,14 @@
                 try {
                     showLoadingOverlay("Mempersiapkan gambar kustom untuk berbagi...");
 
+                    // Tentukan URL gambar yang akan digunakan: prioritaskan gambar lokal, lalu URL kustom, terakhir gambar acak
+                    const imageUrlToUse = currentLocalImageBlob || customImageURLInput.value.trim() || getRandomImageUrl();
+
                     // For custom cards FOR SHARING, create element with text OVERLAY on image
                     downloadableElement = await createDownloadableElement(
                         '', 
                         manualAffirmationInput.innerHTML, // Pass rich text for image generation
-                        previewImage.src, 
+                        imageUrlToUse, // Gunakan gambar yang ditentukan
                         true, // Indicate this is a custom card
                         customTitle, // Pass the custom title explicitly
                         true // THIS IS THE KEY: set forShare to true to get text on image
